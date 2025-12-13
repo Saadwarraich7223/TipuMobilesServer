@@ -5,7 +5,7 @@ import rateLimit from "express-rate-limit";
 import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
 import { xss } from "express-xss-sanitizer";
-import csrf from "csurf";
+// import csrf from "csurf";
 import compression from "compression";
 
 export const applySecurityMiddlewares = (
