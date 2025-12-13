@@ -40,14 +40,14 @@ applySecurityMiddlewares(app, {
 });
 
 // 3. Routes
-app.use("/api/auth", userRouter);
-app.use("/api/categories", categoryRouter);
-app.use("/api/products", productRouter);
-app.use("/api", cartRouter);
-app.use("/api", reviewRouter);
-app.use("/api/orders", orderRouter);
-app.use("/api/flashSales", flashSaleRouter);
-app.use("/api/address", addressRouter);
+app.use("/auth", userRouter);
+app.use("/categories", categoryRouter);
+app.use("/products", productRouter);
+app.use("/", cartRouter);
+app.use("/", reviewRouter);
+app.use("/orders", orderRouter);
+app.use("/flashSales", flashSaleRouter);
+app.use("/address", addressRouter);
 
 app.use(errorHandler);
 
