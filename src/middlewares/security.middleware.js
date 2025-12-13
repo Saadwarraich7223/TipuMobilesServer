@@ -33,14 +33,14 @@ export const applySecurityMiddlewares = (
   // 4. Gzip compression
   app.use(compression());
 
-  // 5. Rate limiting (global). More aggressive on auth routes (see below)
-  const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 200, // max requests per IP per window
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  app.use(globalLimiter);
+  // // 5. Rate limiting (global). More aggressive on auth routes (see below)
+  // const globalLimiter = rateLimit({
+  //   windowMs: 15 * 60 * 1000, // 15 minutes
+  //   max: 200, // max requests per IP per window
+  //   standardHeaders: true,
+  //   legacyHeaders: false,
+  // });
+  // app.use(globalLimiter);
 
   // 6. Protect against HTTP parameter pollution (duplicate query params)
   app.use(hpp());

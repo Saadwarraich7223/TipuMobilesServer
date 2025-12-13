@@ -39,11 +39,11 @@ userRouter.get("/", authenticateUser, adminAuth, adminLimiter, getUsers);
 /*==================== AUTH ====================*/
 userRouter.post(
   "/register",
-  registerLimiter,
+
   validate(registerSchema),
   registerUser
 );
-userRouter.post("/login", loginLimiter, validate(loginSchema), loginUser);
+userRouter.post("/login", validate(loginSchema), loginUser);
 
 /*==================== SESSION ====================*/
 userRouter.post("/logout", authenticateUser, logoutUser);
