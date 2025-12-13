@@ -59,22 +59,22 @@ export const applySecurityMiddlewares = (
   app.use(mongoSanitize());
 
   // 9. CSRF protection (only enable if using cookie-based auth)
-  if (env === "production" || env === "staging") {
-    // Use cookie-based CSRF tokens. For APIs using JWT in Authorization header, CSRF is less relevant.
-    const csrfProtection = csrf({
-      cookie: {
-        httpOnly: true,
-        sameSite: env === "production" ? "none" : "lax",
-        secure: env === "production",
-      },
-    });
-    app.use(csrfProtection);
+  // if (env === "production" || env === "staging") {
+  //   // Use cookie-based CSRF tokens. For APIs using JWT in Authorization header, CSRF is less relevant.
+  //   const csrfProtection = csrf({
+  //     cookie: {
+  //       httpOnly: true,
+  //       sameSite: env === "production" ? "none" : "lax",
+  //       secure: env === "production",
+  //     },
+  //   });
+  //   app.use(csrfProtection);
 
-    // Expose token endpoint (example)
-    app.get("/csrf-token", (req, res) => {
-      res.json({ csrfToken: req.csrfToken() });
-    });
-  }
+  //   // Expose token endpoint (example)
+  //   app.get("/csrf-token", (req, res) => {
+  //     res.json({ csrfToken: req.csrfToken() });
+  //   });
+  // }
 
   // 10. Rate limit sensitive endpoints separately (example)
   const authLimiter = rateLimit({
