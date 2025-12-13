@@ -13,7 +13,7 @@ export const applySecurityMiddlewares = (
   { trustedOrigin = "*", env = "development" } = {}
 ) => {
   // 1. Basic parsers (do these in app.js before this if not done here)
-  app.set("trust proxy", 1);
+
   // 2. HTTP headers protection
 
   app.use(
