@@ -64,14 +64,14 @@ export const applySecurityMiddlewares = (
     const csrfProtection = csrf({
       cookie: {
         httpOnly: true,
-        sameSite: "strict",
+        sameSite: env === "production" ? "none" : "lax",
         secure: env === "production",
       },
     });
     app.use(csrfProtection);
 
     // Expose token endpoint (example)
-    app.get("/api/csrf-token", (req, res) => {
+    app.get("/csrf-token", (req, res) => {
       res.json({ csrfToken: req.csrfToken() });
     });
   }
