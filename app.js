@@ -31,10 +31,11 @@ app.use((req, res, next) => {
 app.use(globalLimiter);
 
 const ENV = process.env.NODE_ENV || "development";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 // 2. Apply security middlewares
 applySecurityMiddlewares(app, {
-  trustedOrigin: process.env.CLIENT_URL,
+  trustedOrigin: FRONTEND_URL,
   env: ENV,
 });
 
