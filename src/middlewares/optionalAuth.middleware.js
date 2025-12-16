@@ -4,29 +4,28 @@ import User from "../models/user.model.js";
 const optionalAuth = async (req, res, next) => {
   try {
     const token =
-      req?.cookies.accessToken ||
-      req?.headers["authorization"]?.replace("Bearer", "").trim();
+      req.cookies?.accessToken ||
+      req.headers.authorization?.replace("Bearer ", "");
+
     if (!token || !process.env.ACCESS_TOKEN_SECRET) {
-      return next();
+      return next(); // guest user
     }
 
-    const decodedtoken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
-    const user = await User.findById(decodedtoken?.id).select(
+    const user = await User.findById(decodedToken.id).select(
       "-password -refreshToken"
     );
 
     if (user) {
       req.user = user;
     }
+
+    return next();
   } catch (error) {
     console.error("JWT Auth Error:", error.message);
-    res.status(401).json({
-      message: "No Token , Proceed As Guest",
-      success: false,
-    });
+    return next();
   }
-  next();
 };
 
 export default optionalAuth;

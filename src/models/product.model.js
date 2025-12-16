@@ -144,6 +144,7 @@ productSchema.index({ category: 1, status: 1 });
 
 // For sorting by price
 productSchema.index({ price: 1 });
+productSchema.index({ averageRating: -1, numReviews: -1 });
 
 // Full-text search
 productSchema.index(
@@ -378,6 +379,8 @@ productSchema.statics.fetchProducts = async function (query) {
       "-createdAt",
       "stock",
       "-stock",
+      "averageRating",
+      "-averageRating",
     ];
     const sortOption = allowedSortFields.includes(sort) ? sort : "-createdAt";
 

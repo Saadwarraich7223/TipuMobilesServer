@@ -318,6 +318,8 @@ export const clearCart = async (req, res) => {
 ============================================================ */
 export const getCart = async (req, res) => {
   try {
+    console.log("getCart reached");
+
     const userId = req.user?._id;
     const cartToken = req.headers["x-cart-token"] || null;
 
