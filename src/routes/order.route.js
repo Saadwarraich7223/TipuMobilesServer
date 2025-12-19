@@ -2,6 +2,7 @@ import express from "express";
 import optionalAuth from "../middlewares/optionalAuth.middleware.js";
 import {
   cancelOrder,
+  checkoutPreview,
   createOrder,
   deleteOrder,
   getAllOrders,
@@ -17,7 +18,8 @@ import adminAuth from "../middlewares/adminAuth.middleware.js";
 const orderRouter = express.Router();
 
 // Place an order
-orderRouter.post("/create", authenticateUser, createOrder);
+orderRouter.get("/checkout", optionalAuth, checkoutPreview);
+orderRouter.post("/create", optionalAuth, createOrder);
 
 // Get logged-in user's all orders
 orderRouter.get("/my", authenticateUser, getSingleUserOrders);

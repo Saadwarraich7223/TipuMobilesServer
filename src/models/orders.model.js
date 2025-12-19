@@ -269,6 +269,35 @@ orderSchema.methods.deductStock = async function ({ session }) {
   }
 };
 
+orderSchema.methods.restoreStock = async function ({ session }) {
+  const bulkOps = [];
+
+  for (const item of this.orderItems) {
+    if (item.variant) {
+      bulkOps.push({
+        updateOne: {
+          filter: {
+            _id: item.product,
+            "variants._id": item.variant,
+          },
+          update: {
+            $inc: { "variants.$.stock": item.quantity },
+          },
+        },
+      });
+    } else {
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: item.product },
+          update: { $inc: { stock: item.quantity } },
+        },
+      });
+    }
+  }
+
+  await Product.bulkWrite(bulkOps, { session });
+};
+
 orderSchema.index({ user: 1 });
 orderSchema.index({ orderStatus: 1 });
 orderSchema.index({ createdAt: -1 });

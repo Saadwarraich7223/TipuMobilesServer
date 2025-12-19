@@ -120,7 +120,7 @@ export const updateAddress = async (req, res) => {
     if (isDefault) {
       await Address.updateMany({ user: address.user }, { isDefault: false });
     }
-    console.log(city);
+
     // Update the address
     address.fullName = fullName || address.fullName;
     address.phone = phone || address.phone;

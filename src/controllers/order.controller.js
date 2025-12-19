@@ -2,19 +2,59 @@ import mongoose from "mongoose";
 import Order from "../models/orders.model.js";
 import AppError from "../utils/AppError.js";
 import getOrCreateCart from "../utils/cart.helper.js";
-import { filter } from "compression";
+import Address from "../models/address.model.js";
+
+export const checkoutPreview = async (req, res, next) => {
+  try {
+    const userId = req.user?._id;
+    const cartToken = req.headers["x-cart-token"] || null;
+
+    const cart = await getOrCreateCart(userId, cartToken);
+    if (!cart || cart.items.length === 0) {
+      throw new AppError("Cart is empty", 400);
+    }
+
+    // Fetch addresses
+    let addresses = [];
+    let defaultAddress = null;
+
+    if (userId) {
+      addresses = await Address.find({ user: userId }).lean();
+      defaultAddress = addresses.find((a) => a.isDefault);
+    }
+
+    const totals = Order.calculateGrandTotal(cart.items);
+
+    res.status(200).json({
+      success: true,
+      cart: {
+        items: cart.items,
+        totalAmount: totals.totalAmount,
+        shippingFee: totals.shippingFee,
+        discount: totals.discount,
+        grandTotal: totals.grandTotal,
+      },
+      addresses: addresses || [],
+      defaultAddressId: defaultAddress?._id || null,
+    });
+  } catch (err) {
+    console.log(err);
+  }
+};
 
 export const createOrder = async (req, res, next) => {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const user = req.user;
+      const user = req.user || null; // could be null for guest users
       const cartToken = req.headers["x-cart-token"] || null;
-      const {
-        shippingInfo,
-        paymentMethod = "COD", // default
-      } = req.body;
-      const cart = await getOrCreateCart(user._id, cartToken);
+      const { shippingInfo, paymentMethod = "COD" } = req.body;
+
+      if (!shippingInfo) {
+        throw new AppError("Shipping information is required", 400);
+      }
+
+      const cart = await getOrCreateCart(user?._id, cartToken);
 
       if (!cart || cart.items.length === 0) {
         throw new AppError("Your cart is empty", 400);
@@ -33,9 +73,9 @@ export const createOrder = async (req, res, next) => {
       const totals = await Order.calculateGrandTotal(orderItems);
 
       const order = new Order({
-        user: user ? user._id : null,
+        user: user?._id || null,
         orderItems,
-        shippingInfo,
+        shippingInfo, // coming directly from frontend
         paymentMethod,
         totalAmount: totals.totalAmount,
         shippingFee: totals.shippingFee,
@@ -43,28 +83,32 @@ export const createOrder = async (req, res, next) => {
         grandTotal: totals.grandTotal,
       });
 
-      // Validating Stock before placing order : Like may be some product is out of stock or dont have enough stock
+      // Validating stock before placing order
       await order.validateStockAvailability();
-      // Saving Order
+
+      // Saving order
       await order.save({ session });
-      // Adding Event
+
+      // Adding order event
       await order.addEvent({
         event: "order_placed",
         message: "Order placed successfully",
-        session: session,
+        session,
       });
 
-      // Deducting Stock : after placing the order reducing the items stock
+      // Deducting stock
       await order.deductStock({ session });
-      // Clearing Cart
+
+      // Clearing cart
       await cart.clearCart(session);
     });
+
     return res.status(201).json({
       success: true,
       message: "Order placed successfully.",
     });
   } catch (error) {
-    console.error(" Transaction failed", error);
+    console.error("Transaction failed", error);
     next(error);
   } finally {
     session.endSession();
@@ -195,9 +239,7 @@ export const updateOrderStatus = async (req, res) => {
     if (status === "delivered") {
       order.deliveredAt = Date.now();
     }
-    if (status === "confirmed") {
-      await order.deductStock();
-    }
+
     await order.save();
 
     return res.status(200).json({
@@ -217,15 +259,24 @@ export const updateOrderStatus = async (req, res) => {
 export const cancelOrder = async (req, res) => {
   try {
     const { id } = req.params;
+    const session = await mongoose.startSession();
+    await session.withTransaction(async () => {
+      const order = await Order.findById(id).session(session);
+      if (!order) throw new AppError("Order not found", 404);
 
-    const order = await Order.findByIdAndUpdate(id, {
-      orderStatus: "cancelled",
-      cancelledAt: Date.now(),
+      if (order.orderStatus === "cancelled") return;
+
+      await order.restoreStock({ session });
+
+      order.orderStatus = "cancelled";
+      await order.addEvent({
+        event: "order_cancelled",
+        message: "Order cancelled",
+        session,
+      });
+
+      await order.save({ session });
     });
-
-    if (!order) {
-      throw new AppError("Order not found", 400);
-    }
 
     return res.status(200).json({
       success: true,
@@ -267,13 +318,21 @@ export const deleteOrder = async (req, res) => {
 export const markOrderAsPaid = async (req, res) => {
   try {
     const { id } = req.params;
-    const order = await Order.findByIdAndUpdate(id, {
-      paymentStatus: "paid",
-      paidAt: Date.now(),
-    });
+    const order = await Order.findByIdAndUpdate(id);
+
     if (!order) {
       throw new AppError("Order not found", 400);
     }
+    order.paymentStatus = "paid";
+    order.paidAt = new Date();
+    order.orderStatus = "confirmed";
+
+    await order.addEvent({
+      event: "payment_success",
+      message: "Payment completed successfully",
+    });
+
+    await order.save();
 
     return res.status(200).json({
       success: true,
