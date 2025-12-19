@@ -17,24 +17,31 @@ import adminAuth from "../middlewares/adminAuth.middleware.js";
 
 const orderRouter = express.Router();
 
-// Place an order
+// ================= Public / User =================
+
+// Checkout preview
 orderRouter.get("/checkout", optionalAuth, checkoutPreview);
+
+// Create order
 orderRouter.post("/create", optionalAuth, createOrder);
 
-// Get logged-in user's all orders
+// Logged-in user's orders
 orderRouter.get("/my", authenticateUser, getSingleUserOrders);
 
-// Get a specific order by ID (for user or admin)
-orderRouter.get("/:id", authenticateUser, getSingleOrder);
+// ================= Admin =================
 
-// =============== Admin Routes ===============
-
-// Get all orders (admin only)
-// GET / api / admin / orders / summary;
+// Order summary (admin)
 orderRouter.get("/summary", authenticateUser, adminAuth, getOrderSummary);
+
+// All orders (admin)
 orderRouter.get("/", authenticateUser, adminAuth, getAllOrders);
 
-// Update order status (admin only)
+// ================= ID-based routes (LAST) =================
+
+// Get one order
+orderRouter.get("/:id", authenticateUser, getSingleOrder);
+
+// Update order status
 orderRouter.patch(
   "/:id/status",
   authenticateUser,
@@ -42,7 +49,7 @@ orderRouter.patch(
   updateOrderStatus
 );
 
-// Mark order as paid (admin or payment service)
+// Mark as paid
 orderRouter.patch(
   "/:id/mark-paid",
   authenticateUser,
@@ -50,10 +57,10 @@ orderRouter.patch(
   markOrderAsPaid
 );
 
-// Cancel an order (admin only)
+// Cancel order
 orderRouter.patch("/:id/cancel", authenticateUser, adminAuth, cancelOrder);
 
-// Delete an order (admin only)
+// Delete order
 orderRouter.delete("/:id", authenticateUser, adminAuth, deleteOrder);
 
 export default orderRouter;

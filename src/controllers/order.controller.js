@@ -189,6 +189,12 @@ export const getSingleUserOrders = async (req, res) => {
 export const getSingleOrder = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID",
+      });
+    }
     const order = await Order.findById(id).lean();
     if (!order) {
       throw new AppError("Order not found", 400);
