@@ -45,6 +45,7 @@ export const checkoutPreview = async (req, res, next) => {
 export const createOrder = async (req, res, next) => {
   const session = await mongoose.startSession();
   try {
+    let order = null;
     await session.withTransaction(async () => {
       const user = req.user || null; // could be null for guest users
       const cartToken = req.headers["x-cart-token"] || null;
@@ -72,7 +73,7 @@ export const createOrder = async (req, res, next) => {
 
       const totals = await Order.calculateGrandTotal(orderItems);
 
-      const order = new Order({
+      order = new Order({
         user: user?._id || null,
         orderItems,
         shippingInfo, // coming directly from frontend
@@ -106,6 +107,7 @@ export const createOrder = async (req, res, next) => {
     return res.status(201).json({
       success: true,
       message: "Order placed successfully.",
+      order: order,
     });
   } catch (error) {
     console.error("Transaction failed", error);

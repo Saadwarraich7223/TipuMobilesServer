@@ -26,7 +26,7 @@ orderRouter.get("/checkout", optionalAuth, checkoutPreview);
 orderRouter.post("/create", optionalAuth, createOrder);
 
 // Logged-in user's orders
-orderRouter.get("/my", authenticateUser, getSingleUserOrders);
+orderRouter.get("/", authenticateUser, getSingleUserOrders);
 
 // ================= Admin =================
 
