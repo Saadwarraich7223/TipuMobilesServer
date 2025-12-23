@@ -163,7 +163,9 @@ export const getSingleUserOrders = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const orders = await Order.find({ user: userId }).lean();
+    const orders = await Order.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .lean();
 
     if (!orders || orders.length === 0) {
       return res.status(201).json({
