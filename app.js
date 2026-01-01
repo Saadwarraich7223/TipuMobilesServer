@@ -11,6 +11,7 @@ import orderRouter from "./src/routes/order.route.js";
 import { errorHandler } from "./src/middlewares/errorhandle.middleware.js";
 import flashSaleRouter from "./src/routes/flashSale.route.js";
 import addressRouter from "./src/routes/address.route.js";
+import bannerRouter from "./src/routes/banner.route.js";
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use("/", reviewRouter);
 app.use("/orders", orderRouter);
 app.use("/flashSales", flashSaleRouter);
 app.use("/address", addressRouter);
+app.use("/banners", bannerRouter);
 
 app.use(errorHandler);
 
