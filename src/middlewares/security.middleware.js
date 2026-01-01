@@ -23,6 +23,7 @@ export const applySecurityMiddlewares = (
   );
 
   // 3. CORS — restrict origins in production
+  app.set("trust proxy", 1);
   app.use(
     cors({
       origin: env === "production" ? trustedOrigin : true,
