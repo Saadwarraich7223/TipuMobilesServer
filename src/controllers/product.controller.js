@@ -3,11 +3,12 @@ import uploadOnCloudinary from "../utils/cloudinary.js";
 import Review from "../models/review.model.js";
 import mongoose from "mongoose";
 import FlashSale from "../models/flashSale.model.js";
-// import redis from "../utils/redis.js";
-// import {
-//   clearProductCache,
-//   clearSingleProductCache,
-// } from "../utils/cacheUtils.js";
+import redis from "../utils/redis.js";
+
+import {
+  clearProductCache,
+  clearSingleProductCache,
+} from "../utils/cacheUtils.js";
 
 const success = (res, data, message) => {
   return res.status(200).json({ success: true, message, data });
@@ -82,7 +83,8 @@ export const createProduct = async (req, res) => {
     };
 
     const product = await Product.safeCreate(productData);
-    // await clearProductCache();
+    // 5. Clear product cache
+    await clearProductCache();
 
     res.status(201).json({
       success: true,
@@ -187,6 +189,8 @@ export const updateProduct = async (req, res) => {
 
     product.updatedAt = Date.now();
     await product.save();
+    await clearProductCache();
+    await clearSingleProductCache(id);
 
     return res.status(200).json({
       success: true,
@@ -210,7 +214,15 @@ export const getProduct = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Invalid product ID" });
     }
-
+    const cacheKey = `product:${id}`;
+    const cachedProduct = await redis.get(cacheKey);
+    if (cachedProduct) {
+      return res.status(200).json({
+        success: true,
+        message: "Product fetched successfully (cache)",
+        data: cachedProduct,
+      });
+    }
     const product = await Product.findById(id).populate("category", "name");
 
     if (!product) {
@@ -245,17 +257,19 @@ export const getProduct = async (req, res) => {
       "userInfo",
       "name avatar"
     );
+    const responseData = {
+      product,
+      reviews,
+      salePrice,
+      isInFlashSale,
+      flashSaleEndTime,
+    };
+    await redis.set(cacheKey, responseData, { ex: 600 });
 
     return res.status(200).json({
       success: true,
       message: "Product Fetched Successfully",
-      data: {
-        product,
-        reviews,
-        salePrice,
-        isInFlashSale,
-        flashSaleEndTime, // ⭐ ADD TO RESPONSE
-      },
+      data: responseData,
     });
   } catch (err) {
     console.log(err);
@@ -285,8 +299,8 @@ export const updateProductStatus = async (req, res) => {
       { status },
       { new: true }
     );
-    // await clearProductCache();
-    // await clearSingleProductCache(id);
+    await clearProductCache();
+    await clearSingleProductCache(id);
     success(res, updatedProduct, "Product Status Updated Successfully");
   } catch (err) {
     console.error(err.message);
@@ -312,8 +326,8 @@ export const softDeleteProduct = async (req, res) => {
       });
     }
     await product.discontinue();
-    // await clearProductCache();
-    // await clearSingleProductCache(id);
+    await clearProductCache();
+    await clearSingleProductCache(id);
     success(res, `Product named ${product.title} deleted successfully`);
   } catch (err) {
     console.error(err.message);
@@ -339,8 +353,8 @@ export const restoreProduct = async (req, res) => {
       });
     }
     await product.restore();
-    // await clearProductCache();
-    // await clearSingleProductCache(id);
+    await clearProductCache();
+    await clearSingleProductCache(id);
     success(res, `Product named ${product.title} restored successfully`);
   } catch (err) {
     console.error(err.message);
@@ -350,17 +364,16 @@ export const restoreProduct = async (req, res) => {
 // Get Product list with filters
 export const fetchProducts = async (req, res) => {
   try {
-    // const casheKey = `products:${JSON.stringify(req.query)}`;
-    // const cachedData = await redis.get(casheKey);
+    const casheKey = `products:${JSON.stringify(req.query)}`;
+    const cachedData = await redis.get(casheKey);
 
-    // if (cachedData) {
-    //   const parsed = JSON.parse(cachedData);
-    //   return res.status(200).json({
-    //     success: true,
-    //     message: "Products fetched successfully",
-    //     data: parsed,
-    //   });
-    // }
+    if (cachedData) {
+      return res.status(200).json({
+        success: true,
+        message: "Products fetched successfully",
+        data: cachedData,
+      });
+    }
 
     const { products, pagination } = await Product.fetchProducts(req.query);
     if (products.length === 0) {
@@ -369,11 +382,13 @@ export const fetchProducts = async (req, res) => {
         success: false,
       });
     }
+    const responseData = { products, pagination };
+    await redis.set(casheKey, responseData, { ex: 300 });
 
     return res.status(200).json({
       success: true,
       message: "Products fetched successfully",
-      data: { products: products, pagination },
+      data: responseData,
     });
   } catch (err) {
     console.log(err);
@@ -410,8 +425,8 @@ export const addProductVariant = async (req, res) => {
     }
     product.variants.push(variantData);
     await product.save();
-    // clearProductCache();
-    // clearSingleProductCache(id);
+    clearProductCache();
+    clearSingleProductCache(id);
     return res.status(200).json({
       success: true,
       message: `Variant of product ${product.title} added successfully`,
@@ -456,8 +471,8 @@ export const deleteProductVariant = async (req, res) => {
     }
     product.variants.pull(variantId);
     await product.save();
-    // clearProductCache();
-    // clearSingleProductCache(id);
+    clearProductCache();
+    clearSingleProductCache(id);
     return res.status(200).json({
       success: true,
       message: `Variant of product ${product.title} deleted successfully`,
@@ -536,8 +551,8 @@ export const updateProductStock = async (req, res) => {
     }
 
     await product.save();
-    // clearProductCache();
-    // clearSingleProductCache(id);
+    clearProductCache();
+    clearSingleProductCache(id);
     return res.status(200).json({
       success: true,
       message: `Stock of product ${product.title} ${operation} by ${stock} successfully`,
@@ -581,7 +596,8 @@ export const updateVariantStock = async (req, res) => {
     }
 
     await product.save();
-
+    await clearProductCache();
+    await clearSingleProductCache(id);
     return res.json({
       success: true,
       message: `Variant stock ${operation}d successfully by ${stock}`,
@@ -623,8 +639,8 @@ export const deleteProductPermanently = async (req, res) => {
     }
 
     await Product.findByIdAndDelete(id);
-    // clearProductCache();
-    // clearSingleProductCache(id);
+    clearProductCache();
+    clearSingleProductCache(id);
     return res.status(200).json({
       success: true,
       message: `Product named ${product.title} deleted successfully`,

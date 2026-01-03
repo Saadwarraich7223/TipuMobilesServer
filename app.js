@@ -32,11 +32,14 @@ app.use((req, res, next) => {
 app.use(globalLimiter);
 
 const ENV = process.env.NODE_ENV || "development";
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+
+const FRONTEND_URL =
+  process.env.FRONTEND_URL || "https://tipu-mobiles-frontend.vercel.app";
+const DEV_URL = "http://localhost:5173";
 
 // 2. Apply security middlewares
 applySecurityMiddlewares(app, {
-  trustedOrigin: FRONTEND_URL,
+  trustedOrigin: ENV === "production" ? FRONTEND_URL : DEV_URL,
   env: ENV,
 });
 

@@ -3,6 +3,8 @@ import Category from "../models/category.model.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
 import Product from "../models/product.model.js";
 import FlashSale from "../models/flashSale.model.js";
+import redis from "../utils/redis.js";
+import { clearCategoryCache } from "../utils/cacheUtils.js";
 
 // Utility for consistent responses
 const success = (res, data, message = "Success") =>
@@ -75,6 +77,7 @@ export const createCategory = async (req, res) => {
     });
 
     await category.save();
+    await clearCategoryCache();
 
     return res.status(201).json({
       success: true,
@@ -103,6 +106,14 @@ export const createCategory = async (req, res) => {
 // Get All Categories :: ADMIN ONLY
 export const getAllCategories = async (req, res) => {
   try {
+    const cacheKey = "categories";
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        categories: cachedData,
+        message: "Categories Fetched Successfully(from cache)",
+      });
+    }
     const categories = await Category.find().populate("parent", "name").lean();
 
     if (categories.length === 0) {
@@ -111,6 +122,7 @@ export const getAllCategories = async (req, res) => {
         success: false,
       });
     }
+    await redis.set(cacheKey, categories, { ex: 600 });
 
     success(res, categories, "Categories Fetched Successfully");
   } catch (err) {
@@ -122,6 +134,15 @@ export const getAllCategories = async (req, res) => {
 // Get Nested Categories :: ADMIN ONLY
 export const getNestedCategories = async (req, res) => {
   try {
+    const cacheKey = "categories:nested";
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return success(
+        res,
+        cachedData,
+        "Categories Fetched Successfully(from cache)"
+      );
+    }
     const nestedCategories = await Category.getNestedCategories();
     if (nestedCategories.length === 0) {
       return res.status(400).json({
@@ -129,6 +150,7 @@ export const getNestedCategories = async (req, res) => {
         success: false,
       });
     }
+    await redis.set(cacheKey, nestedCategories, { ex: 600 });
 
     success(res, nestedCategories, "Categories Fetched Successfully");
   } catch (err) {
@@ -241,6 +263,26 @@ export const getProductsByCategory = async (req, res) => {
       search,
     } = req.query;
 
+    const categoryKey = slug || "all";
+
+    const cacheKey =
+      `products:${categoryKey}:page:${page}:limit:${limit}:` +
+      `minPrice:${minPrice || ""}:maxPrice:${maxPrice || ""}:` +
+      `brand:${brand || ""}:minRating:${minRating || ""}:sort:${sort || ""}:` +
+      `freeDelivery:${freeDelivery || ""}:discount:${discount || ""}:` +
+      `minDiscount:${minDiscount || ""}:maxDiscount:${
+        maxDiscount || ""
+      }:search:${search || ""}`;
+
+    console.log("My Key", cacheKey);
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Products fetched successfully (from cache)",
+        ...cachedData,
+      });
+    }
+
     let filters = { status: "published" };
 
     // 1. CATEGORY
@@ -330,11 +372,15 @@ export const getProductsByCategory = async (req, res) => {
     }));
 
     // 7. RESPONSE
-    return res.status(200).json({
-      message: "Products fetched successfully",
+    const responseData = {
       products: productsWithSale,
       total,
       hasMore: page * limit < total,
+    };
+    await redis.set(cacheKey, responseData, { ex: 600 });
+    return res.status(200).json({
+      message: "Products fetched successfully",
+      ...responseData,
     });
   } catch (err) {
     console.error(err);

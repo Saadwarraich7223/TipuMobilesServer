@@ -1,5 +1,7 @@
 import Banner from "../models/banner.model.js";
+import { clearBannerCache } from "../utils/cacheUtils.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
+import redis from "../utils/redis.js";
 
 export const createBanner = async (req, res) => {
   try {
@@ -33,6 +35,7 @@ export const createBanner = async (req, res) => {
       priority: priority !== undefined ? priority : 0,
     });
     await banner.save();
+    await clearBannerCache();
     return res.status(201).json({
       message: "Banner created successfully",
       success: true,
@@ -47,14 +50,24 @@ export const createBanner = async (req, res) => {
 export const getAllBanners = async (req, res) => {
   try {
     const { position, isActive } = req.query;
+
     const query = {};
     if (position) query.position = position;
     if (isActive !== undefined) {
       query.isActive = isActive === "true";
     }
 
+    const casheKey = `banners:${JSON.stringify(query)}`;
+    const cachedData = await redis.get(casheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Banners fetched successfully(from cache)",
+        success: true,
+        data: cachedData,
+      });
+    }
     const banners = await Banner.find(query).sort({ priority: 1 });
-
+    await redis.set(casheKey, banners, { ex: 600 });
     res.status(200).json({
       message: "Banners fetched successfully",
       success: true,
@@ -76,6 +89,7 @@ export const deleteBanner = async (req, res) => {
         success: false,
       });
     }
+    await clearBannerCache();
     res.status(200).json({
       message: "Banner deleted successfully",
       success: true,

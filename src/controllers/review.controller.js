@@ -1,9 +1,14 @@
 import Product from "../models/product.model.js";
 import Review from "../models/review.model.js";
 import {
+  clearProductReviews,
+  clearTop5ReviewCache,
+} from "../utils/cacheUtils.js";
+import {
   receivedReviewReplyByAdminTemplate,
   receivedReviewTemplate,
 } from "../utils/emailTemplate.js";
+import redis from "../utils/redis.js";
 import sendEmail from "../utils/sendEmail.js";
 
 // add review
@@ -61,6 +66,8 @@ export const createReview = async (req, res) => {
       "New Review",
       receivedReviewTemplate(req.user.name, product.title, comment, rating)
     );
+    await clearTop5ReviewCache();
+    await clearProductReviews(productId);
     return res.status(200).json({
       success: true,
       message: "Reviewed  successfully.",
@@ -75,15 +82,24 @@ export const createReview = async (req, res) => {
 // get product reviews
 export const getProductReviews = async (req, res) => {
   try {
+    const { productId } = req.params;
     const { sort, limit = 10, page = 1, rating } = req.query;
 
     const skip = (page - 1) * limit;
+    const cacheKey = `reviews:product:${productId}:sort:${
+      sort || "latest"
+    }:rating:${rating || "all"}:page:${page}:limit:${limit}`;
+
+    // Check cache
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
 
     const sortBy = sort || "latest";
     const sortOptions = { createdAt: -1 };
     if (sortBy === "highest") sortOptions = { rating: -1 };
     if (sortBy === "lowest") sortOptions = { rating: 1 };
-    const { productId } = req.params;
 
     const ratingFilters = rating ? { rating: Number(rating) } : {};
 
@@ -120,14 +136,16 @@ export const getProductReviews = async (req, res) => {
     product.numReviews = total;
 
     product.save();
-
-    return res.status(200).json({
+    const response = {
       success: true,
       reviews: reviews,
       Total: total,
       Page: page,
       Limit: limit,
-    });
+    };
+    await redis.set(cacheKey, response, { ex: 600 }); // cache for 10 minutes
+
+    return res.status(200).json(response);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -204,7 +222,8 @@ export const deleteReview = async (req, res) => {
         .json({ success: false, message: "Review not found." });
     }
     await review.deleteOne();
-
+    await clearTop5ReviewCache();
+    await clearProductReviews(productId);
     return res.status(200).json({
       success: true,
       message: "Review deleted successfully.",
@@ -296,7 +315,8 @@ export const updateReviewStatusByAdmin = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Review not found" });
     }
-
+    await clearTop5ReviewCache();
+    await clearProductReviews(productId);
     return res.status(200).json({
       success: true,
       message: `Review status updated to ${status}`,
@@ -319,6 +339,8 @@ export const deleteReviewsByAdmin = async (req, res) => {
       });
     }
     const deletedReviews = await Review.deleteMany({ _id: { $in: reviewIds } });
+    await clearTop5ReviewCache();
+    await clearProductReviews(productId);
     return res.status(200).json({
       success: true,
       message: `${deletedReviews.deletedCount} reviews deleted successfully`,
@@ -385,6 +407,8 @@ export const replyToReview = async (req, res) => {
         review.rating
       )
     );
+    await clearTop5ReviewCache();
+    await clearProductReviews(productId);
     return res
       .status(200)
       .json({ success: true, message: "Reply sent successfully" });
@@ -398,6 +422,15 @@ export const replyToReview = async (req, res) => {
 export const getTopFiveReviews = async (req, res) => {
   try {
     // Fetch top 5 reviews globally (best first)
+    const cacheKey = "reviews:top5";
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        success: true,
+        message: "Top 5 reviews fetched successfully (from cache).",
+        reviews: cachedData,
+      });
+    }
     const topReviews = await Review.find()
       .populate({
         path: "user",
@@ -410,7 +443,7 @@ export const getTopFiveReviews = async (req, res) => {
       .sort({ rating: -1, createdAt: -1 })
       .limit(5)
       .lean();
-
+    await redis.set(cacheKey, topReviews, { ex: 600 }); // cache for 10 minutes
     return res.status(200).json({
       success: true,
       message: "Top 5 reviews fetched successfully.",

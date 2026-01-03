@@ -1,11 +1,14 @@
-// import Redis from "ioredis";
+import { Redis } from "@upstash/redis";
+import dotenv from "dotenv";
 
-// const redis = new Redis({
-//   // host: process.env.REDIS_HOST,
-//   // port: process.env.REDIS_PORT,
-// });
+// Ensure env is loaded immediately
+dotenv.config();
+console.log("Redis URL:", process.env.UPSTASH_REDIS_REST_URL);
+console.log("Redis Token:", process.env.UPSTASH_REDIS_REST_TOKEN);
 
-// redis.on("connect", () => console.log("Redis connected"));
-// redis.on("error", (err) => console.log("Redis Error", err));
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
-// export default redis;
+export default redis;

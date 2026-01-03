@@ -1,4 +1,6 @@
 import FlashSale from "../models/flashSale.model.js";
+import { clearFlashSaleCache } from "../utils/cacheUtils.js";
+import redis from "../utils/redis.js";
 
 // ==============================
 // CREATE FLASH SALE
@@ -22,7 +24,7 @@ export const createFlashSale = async (req, res) => {
     }
 
     const flashSale = await FlashSale.create({ title, endTime, products });
-
+    await clearFlashSaleCache();
     res.status(201).json({
       message: "Flash Sale created successfully",
       flashSale,
@@ -38,11 +40,24 @@ export const createFlashSale = async (req, res) => {
 // ==============================
 export const getAllFlashSales = async (req, res) => {
   try {
+    const cacheKey = "flashSales:all";
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Flash sales fetched successfully (from cache)",
+        success: true,
+        sales: cachedData,
+      });
+    }
     const sales = await FlashSale.find()
       .sort({ createdAt: -1 })
       .populate("products.product");
-
-    res.json(sales);
+    await redis.set(cacheKey, sales, { ex: 600 }); // cache for 10 minutes
+    res.status(200).json({
+      message: "Flash sales fetched successfully ",
+      success: true,
+      sales,
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: "Something went wrong" });
@@ -55,6 +70,11 @@ export const getAllFlashSales = async (req, res) => {
 
 export const getActiveFlashSales = async (req, res) => {
   try {
+    const cacheKey = "flashSales:active";
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
     const activeSales = await FlashSale.find({
       endTime: { $gt: new Date() }, // active sales only
     })
@@ -89,6 +109,8 @@ export const getActiveFlashSales = async (req, res) => {
       };
     });
 
+    await redis.set(cacheKey, result, { ex: 600 });
+
     return res.status(200).json(result);
   } catch (error) {
     console.error(error);
@@ -101,6 +123,11 @@ export const getActiveFlashSales = async (req, res) => {
 // ==============================
 export const getExpiredFlashSales = async (req, res) => {
   try {
+    const cacheKey = "flashSales:expired";
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
     const expiredSales = await FlashSale.find({
       endTime: { $lte: new Date() }, // expired sales only
     })
@@ -135,6 +162,8 @@ export const getExpiredFlashSales = async (req, res) => {
       };
     });
 
+    await redis.set(cacheKey, result, { ex: 600 });
+
     return res.status(200).json(result);
   } catch (error) {
     console.log(error);
@@ -153,6 +182,7 @@ export const deleteFlashSale = async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: "Flash sale not found" });
     }
+    await clearFlashSaleCache();
 
     res.json({ message: "Flash sale deleted successfully" });
   } catch (error) {
