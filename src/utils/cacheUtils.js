@@ -1,3 +1,5 @@
+import redis from "./redis.js";
+
 export const clearProductCache = async () => {
   try {
     // Get all keys starting with "products:"
@@ -39,7 +41,7 @@ export const clearCategoryCache = async () => {
 
 export const clearFlashSaleCache = async () => {
   try {
-    const key = await redis.keys("flashSale:all");
+    const key = await redis.keys("flashSales:*");
     if (key) {
       await redis.del(key);
       console.log(` Cleared ${key.length} flashSale cache keys`);

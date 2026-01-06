@@ -122,7 +122,7 @@ export const getAllCategories = async (req, res) => {
         success: false,
       });
     }
-    await redis.set(cacheKey, categories, { ex: 600 });
+    await redis.set(cacheKey, categories, { ex: 2400 });
 
     success(res, categories, "Categories Fetched Successfully");
   } catch (err) {
@@ -150,7 +150,7 @@ export const getNestedCategories = async (req, res) => {
         success: false,
       });
     }
-    await redis.set(cacheKey, nestedCategories, { ex: 600 });
+    await redis.set(cacheKey, nestedCategories, { ex: 2400 });
 
     success(res, nestedCategories, "Categories Fetched Successfully");
   } catch (err) {
@@ -206,6 +206,7 @@ export const deleteCategory = async (req, res) => {
     }
 
     await Category.findByIdAndDelete(id);
+    await clearCategoryCache();
     success(res, `Category named ${category.name} deleted successfully`);
   } catch (err) {
     console.error(err.message);
@@ -377,7 +378,7 @@ export const getProductsByCategory = async (req, res) => {
       total,
       hasMore: page * limit < total,
     };
-    await redis.set(cacheKey, responseData, { ex: 600 });
+    await redis.set(cacheKey, responseData, { ex: 1200 });
     return res.status(200).json({
       message: "Products fetched successfully",
       ...responseData,

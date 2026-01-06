@@ -264,7 +264,7 @@ export const getProduct = async (req, res) => {
       isInFlashSale,
       flashSaleEndTime,
     };
-    await redis.set(cacheKey, responseData, { ex: 600 });
+    await redis.set(cacheKey, responseData, { ex: 2400 });
 
     return res.status(200).json({
       success: true,
@@ -383,7 +383,7 @@ export const fetchProducts = async (req, res) => {
       });
     }
     const responseData = { products, pagination };
-    await redis.set(casheKey, responseData, { ex: 300 });
+    await redis.set(casheKey, responseData, { ex: 1200 });
 
     return res.status(200).json({
       success: true,
