@@ -380,8 +380,9 @@ export const getProductsByCategory = async (req, res) => {
     };
     await redis.set(cacheKey, responseData, { ex: 1200 });
     return res.status(200).json({
+      success: true,
       message: "Products fetched successfully",
-      ...responseData,
+      data: responseData,
     });
   } catch (err) {
     console.error(err);
